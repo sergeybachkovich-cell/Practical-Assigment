@@ -1,12 +1,27 @@
+"use strict";
 interface Todo {
-
+    id: number;
+    title: string;
+    description: string;
+    status: TodoStatus;
+    createdAt: Date;
 }
 
 enum TodoStatus {
-
+    PENDING,
+    IN_PROGRESS,
+    COMPLETED
 }
 
 // TODO Task 1: NewTodo = Todo without id, createdAt and status
-type NewTodo = Todo;
+type NewTodo = Omit<Todo, "id" | "createdAt" | "status">;
 
 export { Todo, TodoStatus, NewTodo };
+
+const todo: Todo = {
+  id: 42,
+  title: 'Finish project',
+  description: 'Refactor the data layer',
+  status: TodoStatus.IN_PROGRESS,
+  createdAt: new Date()
+};
