@@ -2,8 +2,6 @@
 // Task 02: Mini functional–utility library
 // All helpers are declared but not implemented.
 
-import { resolve } from "path";
-
 export function mapArray<T, R>(source: readonly T[], mapper: (item: T, index: number) => R): R[] {
     if (source == null)
         throw new TypeError("source is empty");
