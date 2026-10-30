@@ -2,9 +2,9 @@
 interface Todo {
     id: number;
     title: string;
-    description: string;
+    description?: string;
     status: TodoStatus;
-    createdAt: Date;
+    readonly createdAt: Date;
 }
 
 enum TodoStatus {
@@ -23,5 +23,5 @@ const todo: Todo = {
   title: 'Finish project',
   description: 'Refactor the data layer',
   status: TodoStatus.IN_PROGRESS,
-  createdAt: new Date()
+  createdAt: new Date() 
 };
