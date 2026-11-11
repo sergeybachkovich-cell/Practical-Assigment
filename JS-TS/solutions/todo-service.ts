@@ -1,8 +1,6 @@
 import { TodoApi } from './todo-api';
 import { Todo, TodoStatus } from './types';
 
-let todoApi = new TodoApi();
-
 export class TodoService {
   constructor(private readonly api: TodoApi) { }
 
@@ -29,7 +27,13 @@ export class TodoService {
   }
 
   async setStatus(id: number, status: TodoStatus): Promise<Todo> {
-    if (id == null || !status)
+    const isValidStatus = (
+        status === TodoStatus.PENDING
+        || status === TodoStatus.IN_PROGRESS
+        || status === TodoStatus.COMPLETED
+    );
+
+    if (id == null ||  !isValidStatus)
         throw new Error("error setStatus: paameters must be settled");
 
     return this.api.update(id, {status});
