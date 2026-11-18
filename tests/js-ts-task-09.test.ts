@@ -1,13 +1,14 @@
 import { TodoApi } from "../JS-TS/solutions/todo-api";
 import { TodoService } from "../JS-TS/solutions/todo-service";
+import { Todo, TodoStatus } from "../JS-TS/solutions/types";
 /*
 Requirements:
     [+] 1.Jest and ts-jest are already configured — study jest.config.js before you start. Note that no ready-made test file exists for this task: unlike tasks 1-8 and 10, you write the tests yourself.
     [-] 2.Create tests/js-ts-task-09.test.ts and cover at minimum:
         [+]-successful creation of a todo
-        []-toggling status
-        []-search returns matching items
-        []-error is thrown when setStatus is called with a non-existing id
+        [-]-toggling status
+        [-]-search returns matching items
+        [-]-error is thrown when setStatus is called with a non-existing id
     [] 3.Mock the network latency (setTimeout) to keep tests fast.
     [] 4.Achieve at least 90 % line coverage for todo-service.ts and repository.ts: npx jest --coverage --testPathPatterns=js-ts-task-09.
 
@@ -103,17 +104,26 @@ describe('Task 9: Write Unit Tests for Business Logic', () => {
 
   // 2.2
   it('toggling status', async () => {
-    if (!
+    const todo = await todoService.create('title', 'description');
+    const expected = (todo.status === TodoStatus.COMPLETED) ? TodoStatus.PENDING : todo.status + 1;
+    await todoService.toggleStatus(todo.id);
+    await expect(todo.status).toBe(expected);
   });
 
   // 2.3
   it('search returns matching items', async () => {
-
+    const todos: Todo[] = [];
+    for (let i = 0; i < 3; i++) {
+      todos.push(await todoService.create(`title№${i}`, `description№${i}`));
+    }
+    let presumably = await todoService.search('2');
+    expect (presumably[0].title).toBe('title№2');
+    expect (presumably[0].description).toBe('description№2');
   });
 
   // 2.4
   it('error is thrown when setStatus is called with a non-existing id', async () => {
-
+    expect(() => todoService.setStatus(-1, TodoStatus.COMPLETED)).toThrow(TypeError);
     jest.useRealTimers();
   });
 });
