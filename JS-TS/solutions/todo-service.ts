@@ -34,7 +34,7 @@ export class TodoService {
     );
 
     if (id == null ||  !isValidStatus)
-        throw new Error("error setStatus: paameters must be settled");
+        throw new Error("error setStatus: parameters must be settled");
 
     return this.api.update(id, {status});
   }

@@ -1,132 +1,157 @@
-import { TodoApi } from "../JS-TS/solutions/todo-api";
 import { TodoService } from "../JS-TS/solutions/todo-service";
+import { TodoApi } from "../JS-TS/solutions/todo-api";
+import { InMemoryRepository } from "../JS-TS/solutions/repository";
 import { Todo, TodoStatus } from "../JS-TS/solutions/types";
-/*
-Requirements:
-    [+] 1.Jest and ts-jest are already configured — study jest.config.js before you start. Note that no ready-made test file exists for this task: unlike tasks 1-8 and 10, you write the tests yourself.
-    [-] 2.Create tests/js-ts-task-09.test.ts and cover at minimum:
-        [+]-successful creation of a todo
-        [-]-toggling status
-        [-]-search returns matching items
-        [-]-error is thrown when setStatus is called with a non-existing id
-    [] 3.Mock the network latency (setTimeout) to keep tests fast.
-    [] 4.Achieve at least 90 % line coverage for todo-service.ts and repository.ts: npx jest --coverage --testPathPatterns=js-ts-task-09.
+import { TodoNotFoundError } from "../JS-TS/solutions/todo-api";
 
-*/
+describe('Task 9: TodoService and InMemoryRepository Unit Tests', () => {
+    let repo: InMemoryRepository<Todo>;
+    let api: TodoApi;
+    let service: TodoService;
 
-/*  templates that i've find:
-
-// GENERAL:
-describe('typeOfExpectMethods', () => {
-  it('description2', () => {
-    // process for a testing
-    const temporary = someth;
-
-    expect(temporary).toHaveProperty('propName');
-    expect(temporary).toEqual([a, b])
-    expect(temporary).toBe(a);
-    expect(reverted.every((t) => t.status === TodoStatus.PENDING)).toBe(true);
-    expect(() => partition(undefined as unknown as number[], (n) => n > 0)).toThrow(TypeError);
-    expect(() => updateTodo(list, -1, { status: TodoStatus.COMPLETED })).toThrow();
-    expect(base).toHaveLength(0);
-  });
-});
-
-// PROMISES:
-describe('promiseTesting', () => {
-jest.setTimeout(10000);
-  let api: TodoApi;
-
-  beforeEach(() => {
-    api = new TodoApi();
-  });
-
-  it('remove should throw TodoNotFoundError for a non-existing id', async () => {
-    await expect(api.remove(-1)).rejects.toMatchObject({ name: 'TodoNotFoundError' });
-  });
-
-  it('each method should simulate 300-600 ms of latency', async () => {
-    jest.useFakeTimers();
-    const spy = jest.spyOn(global, 'setTimeout');
-    const pending = api.getAll();
-    await jest.runAllTimersAsync();
-    await pending;
-    const delays = spy.mock.calls.map((call) => call[1]);
-    expect(delays.length).toBeGreaterThan(0);
-    delays.forEach((ms) => {
-      expect(ms).toBeGreaterThanOrEqual(300);
-      expect(ms).toBeLessThanOrEqual(600);
+    beforeEach(() => {
+        jest.useFakeTimers();
+        repo = new InMemoryRepository<Todo>();
+        api = new TodoApi(repo);
+        service = new TodoService(api);
     });
-    jest.useRealTimers();
-  });
-});
 
-// CLASSES
-describe('Task 07: Generic Repository', () => {
-  interface Entity { id: number; value: string; }
-  let repo: InMemoryRepository<Entity>;
-
-  beforeEach(() => {
-    repo = new InMemoryRepository<Entity>();
-    repo.add({ id: 1, value: 'A' });
-    repo.add({ id: 2, value: 'B' });
-  });
-
-  it('remove should delete entity', () => {
-    repo.remove(2);
-    expect(repo.findById(2)).toBeUndefined();
-  });
-});
-*/
-
-describe('Task 9: Write Unit Tests for Business Logic', () => {
-  jest.setTimeout(10000);
-  let todoService: TodoService;
-
-  beforeEach(() => {
-    todoService = new TodoService(new TodoApi());
-  });
-
-  // 2.1
-  it('successful creation of a todo', async () => {
-    const todo = await todoService.create("title", "description");
-    await expect(todo).toMatchObject({
-      title: "title",
-      description: "description"
+    afterEach(() => {
+        jest.useRealTimers();
+        jest.restoreAllMocks();
     });
-  });
 
-   it('throwing error to creation of an empty todo', async () => {
-    await expect(todoService.create("", "")).rejects.toThrow(
-      "error create: title isn't settled"
-    );
-  });
+    const runAsync = async <T>(promise: Promise<T>): Promise<T> => {
+        const settled = promise.then(
+            (value) => ({ status: 'fulfilled' as const, value }),
+            (reason) => ({ status: 'rejected' as const, reason })
+        );
+        
+        await jest.runAllTimersAsync();
+        const result = await settled;
+        if (result.status === 'rejected') throw result.reason;
+        return result.value;
+    };
 
-  // 2.2
-  it('toggling status', async () => {
-    const todo = await todoService.create('title', 'description');
-    const expected = (todo.status === TodoStatus.COMPLETED) ? TodoStatus.PENDING : todo.status + 1;
-    await todoService.toggleStatus(todo.id);
-    await expect(todo.status).toBe(expected);
-  });
 
-  // 2.3
-  it('search returns matching items', async () => {
-    const todos: Todo[] = [];
-    for (let i = 0; i < 3; i++) {
-      todos.push(await todoService.create(`title№${i}`, `description№${i}`));
+    describe('TodoService', () => {
+        describe('create()', () => {
+            it('should successfully create a todo with trimmed title and description', async () => {
+                const created = await runAsync(service.create(' Write unit tests ', 'Use Jest'));
+
+                expect(created).toBeDefined();
+                expect(created.id).toEqual(expect.any(Number));
+                expect(created.title).toBe('Write unit tests');
+                expect(created.description).toBe('Use Jest');
+                expect(created.status).toBe(TodoStatus.PENDING);
+            });
+
+            it('should throw an error when title is empty or whitespace', async () => {
+                await expect(service.create('    ')).rejects.toThrow("error create: title isn't settled");
+            });
+        });
+
+        describe('toggleStatus()', () => {
+            it ('should cycle status PENDING -> IN_PROGRESS -> COMPLETED -> PENDING', async () => {
+                const todo = await runAsync(service.create('Toggle task'));
+                expect(todo.status).toBe(TodoStatus.PENDING);
+
+                const test1 = await runAsync(service.toggleStatus(todo.id));
+                expect(test1.status).toBe(TodoStatus.IN_PROGRESS);
+
+                const test2 = await runAsync(service.toggleStatus(todo.id));
+                expect(test2.status).toBe(TodoStatus.COMPLETED);
+
+                const test3 = await runAsync(service.toggleStatus(todo.id));
+                expect(test3.status).toBe(TodoStatus.PENDING);
+            });
+
+            it('should throw an error when toggleng a non-existing id', async () => {
+                await expect(runAsync(service.toggleStatus(9999))).rejects.toThrow(
+                    "error toggleStatus: todo is undefined"
+                );
+            });
+        });
+
+        describe('setStatus()', () => {
+            it('should update status to a valid TodoStatus', async () => {
+                const todo = await runAsync(service.create('Set status task'));
+
+                const updated = await runAsync(service.setStatus(todo.id, TodoStatus.COMPLETED));
+                expect(updated.status).toBe(TodoStatus.COMPLETED);
+            });
+
+            it('should throw TodoNotFoundError when setStatus is called with a non-exicting id', async () => {
+                await expect(runAsync(service.setStatus(9999, TodoStatus.PENDING))).rejects.toThrow(
+                    TodoNotFoundError
+                );
+
+            });
+
+            it('should throw an error when id is null or status is invalid', async () => {
+                await expect(service.setStatus(null as unknown as number, TodoStatus.PENDING)).rejects.toThrow(
+                    'error setStatus: parameters must be settled'
+                );
+            });
+        });
+
+        describe('search()', () => {
+            it('should return matching items by title or description (case-insensitive)', async () => {
+                await runAsync(service.create('Buy milk', 'From local store'));
+                await runAsync(service.create('Study TypeScript', 'Generics and utility types'));
+                await runAsync(service.create('Clean desk'));
+
+                const byTitle = await runAsync(service.search('MILK'));
+                expect(byTitle).toHaveLength(1);
+                expect(byTitle[0].title).toBe('Buy milk');
+
+                const byDescription = await runAsync(service.search('generics'));
+                expect(byDescription).toHaveLength(1);
+                expect(byDescription[0].title).toBe('Study TypeScript');
+            });
+
+            it('should thorw an error when search keyword is empty or whitespace', async () => {
+                await expect(service.search('   ')).rejects.toThrow("error search: keyword isn't settled");
+            });
+        });
+    });
+});
+
+describe('InMemodyRepository (direct unit tests for 90%+ coverage)', () => {
+    interface TestEntity {
+        id: number;
+        name: string;
     }
-    let presumably = await todoService.search('2');
-    expect (presumably[0].title).toBe('title№2');
-    expect (presumably[0].description).toBe('description№2');
-  });
 
-  // 2.4
-  it('error is thrown when setStatus is called with a non-existing id', async () => {
-    expect(() => todoService.setStatus(-1, TodoStatus.COMPLETED)).toThrow(TypeError);
-    jest.useRealTimers();
-  });
-});
+    let testRepo: InMemoryRepository<TestEntity>;
 
+    beforeEach(() => {
+        testRepo = new InMemoryRepository<TestEntity>();
+    });
 
+    it('should add, findById, findAll, update, and remove entities', () => {
+        const added = testRepo.add({ id: 1, name: 'First' });
+        expect(added).toEqual({ id: 1, name: 'First' });
+        expect(testRepo.findById(1)).toEqual({ id: 1, name: 'First' });
+        expect(testRepo.findAll()).toEqual([{ id: 1, name: 'First' }]);
 
+        // Update не должен перезаписывать id, даже если id передан в patch
+        const updated = testRepo.update(1, { id: 999, name: 'Updated' });
+        expect(updated).toEqual({ id: 1, name: 'Updated' });
+
+        testRepo.remove(1);
+        expect(testRepo.findById(1)).toBeUndefined();
+        expect(testRepo.findAll()).toEqual([]);
+    });
+
+        it('should throw errors on invalid or non-existing ids', () => {
+            const invalidId = undefined as unknown as number;
+
+            expect(() => testRepo.findById(invalidId)).toThrow(`id is undefined`);
+            expect(() => testRepo.update(invalidId, { name: 'X'})).toThrow(`id is undefined`);
+            expect(() => testRepo.remove(invalidId)).toThrow(`id is undefined`);
+
+            expect(() => testRepo.update(999, { name: 'X' })).toThrow('no entity with the given id exists');
+            expect(() => testRepo.remove(999)).toThrow('no entity with the given id exists');
+        });
+    });
